@@ -1,7 +1,7 @@
 {
   "name": "browser-verify",
   "description": "Drive a real Chrome window through the DevTools protocol for page inspection and verification",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "liuchao"
   },

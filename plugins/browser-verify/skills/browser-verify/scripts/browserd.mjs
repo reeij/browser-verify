@@ -2,14 +2,15 @@
 /**
  * Persistent Chrome DevTools Protocol session.
  *
- * Keeps one attached page session alive with a mobile viewport applied, so the
- * page stays in "device mode" instead of snapping back to window size every
- * time a command finishes. Exposes a tiny local HTTP API on 127.0.0.1:9334.
+ * Keeps one attached page session alive. By default the page uses the real
+ * window size; mobile emulation is opt-in. Exposes a tiny local HTTP API on
+ * 127.0.0.1:9334.
  *
  *   GET  /health          -> { ok, targetId, url, viewport }
  *   POST /cdp             -> { method, params } forwarded to the attached page
  *   POST /target          -> { targetId } re-attach to another page
- *   POST /viewport        -> { width, height, mobile } change emulated viewport
+ *   POST /viewport        -> { width, height, mobile } change emulation
+ *                            (send no width/height to fill the real window)
  */
 
 import { createServer } from "node:http";
@@ -22,11 +23,21 @@ const MOBILE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 " +
   "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-const viewport = {
-  width: Number(process.env.BROWSERD_WIDTH || 390),
-  height: Number(process.env.BROWSERD_HEIGHT || 844),
-  mobile: process.env.BROWSERD_DESKTOP !== "1",
-};
+// Default: no device emulation, so the content viewport follows the real
+// window and fills it. Set BROWSERD_WIDTH/BROWSERD_HEIGHT (and optionally
+// BROWSERD_MOBILE=1) to opt into an emulated viewport.
+const explicitlyEmulated =
+  process.env.BROWSERD_WIDTH != null ||
+  process.env.BROWSERD_HEIGHT != null ||
+  process.env.BROWSERD_MOBILE === "1";
+
+let viewport = explicitlyEmulated
+  ? {
+      width: Number(process.env.BROWSERD_WIDTH || 390),
+      height: Number(process.env.BROWSERD_HEIGHT || 844),
+      mobile: process.env.BROWSERD_MOBILE === "1",
+    }
+  : null;
 
 let socket;
 let nextId = 1;
@@ -70,17 +81,20 @@ async function listPages() {
 }
 
 async function applyViewport() {
+  if (!viewport) {
+    await send("Emulation.clearDeviceMetricsOverride");
+    await send("Emulation.setUserAgentOverride", { userAgent: "" });
+    return;
+  }
   await send("Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
     height: viewport.height,
-    deviceScaleFactor: 3,
+    deviceScaleFactor: viewport.mobile ? 3 : 1,
     mobile: viewport.mobile,
   });
-  if (viewport.mobile) {
-    await send("Emulation.setUserAgentOverride", { userAgent: MOBILE_UA });
-  } else {
-    await send("Emulation.setUserAgentOverride", { userAgent: "" });
-  }
+  await send("Emulation.setUserAgentOverride", {
+    userAgent: viewport.mobile ? MOBILE_UA : "",
+  });
 }
 
 async function attach(id) {
@@ -205,7 +219,15 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "POST" && request.url === "/viewport") {
       const body = await readBody(request);
-      Object.assign(viewport, body);
+      if (body.width == null && body.height == null && body.mobile == null) {
+        viewport = null;
+      } else {
+        viewport = {
+          width: Number(body.width ?? viewport?.width ?? 390),
+          height: Number(body.height ?? viewport?.height ?? 844),
+          mobile: Boolean(body.mobile ?? viewport?.mobile ?? false),
+        };
+      }
       await applyViewport();
       return reply(200, { ok: true, viewport });
     }

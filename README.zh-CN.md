@@ -26,10 +26,20 @@ claude plugin install browser-verify@browser-verify-marketplace
 ## 环境要求
 
 - Node.js 22 或更高版本
-- Google Chrome
-- **macOS**：skill 使用 `launchctl` 启动守护进程，使用 `open -na` 启动 Chrome。
-  Linux 和 Windows 需要等价的守护进程启动命令和 Chrome 启动命令；脚本本身是
-  跨平台的。
+- Google Chrome（自动探测；装在其它位置时设置 `CHROME_PATH`）
+- macOS、Linux 或 Windows
+
+## 视窗
+
+默认情况下页面**铺满真实 Chrome 窗口**：不启用设备模拟，因此调整窗口大小会同时
+改变页面尺寸。需要模拟视窗时，在启动 daemon 时指定：
+
+```bash
+BROWSERD_WIDTH=390 BROWSERD_HEIGHT=844 BROWSERD_MOBILE=1 \
+  node scripts/daemon.mjs start
+```
+
+运行时可调用 `POST http://127.0.0.1:9334/viewport` 修改；传 `{}` 恢复为真实窗口。
 
 ## 作为个人 skill 安装
 
@@ -61,12 +71,14 @@ plugins/browser-verify/.claude-plugin/plugin.json
 plugins/browser-verify/skills/browser-verify/SKILL.md
 plugins/browser-verify/skills/browser-verify/scripts/browser.mjs
 plugins/browser-verify/skills/browser-verify/scripts/browserd.mjs
+plugins/browser-verify/skills/browser-verify/scripts/daemon.mjs
+plugins/browser-verify/skills/browser-verify/scripts/chrome.mjs
 LICENSE
 ```
 
-导出的副本使用守护进程端口 `9334` 和临时 Chrome profile
-`/tmp/claude-browser-profile`，因此可以与使用 `9333` 端口的 Codex 副本共存。
-可通过 `BROWSERD_PORT` / `BROWSERD_URL` 覆盖。
+导出的副本使用守护进程端口 `9334` 和系统临时目录（`os.tmpdir()`）下的独立
+Chrome profile，因此可以与使用 `9333` 端口的 Codex 副本共存。可通过
+`BROWSERD_PORT` / `BROWSERD_URL` 覆盖。
 
 ## 许可证
 

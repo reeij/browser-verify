@@ -26,10 +26,22 @@ Restart Claude Code after installation, or run `/reload-plugins` in a session.
 ## Requirements
 
 - Node.js 22 or newer
-- Google Chrome
-- **macOS**: the skill starts the daemon with `launchctl` and launches Chrome
-  with `open -na`. Linux and Windows need an equivalent daemon launch command
-  and Chrome start command; the scripts themselves are cross-platform.
+- Google Chrome (auto-detected; set `CHROME_PATH` if it lives elsewhere)
+- macOS, Linux, or Windows
+
+## Viewport
+
+By default the page fills the real Chrome window: no device emulation is
+applied, so resizing the window resizes the page. Opt into an emulated viewport
+when starting the daemon:
+
+```bash
+BROWSERD_WIDTH=390 BROWSERD_HEIGHT=844 BROWSERD_MOBILE=1 \
+  node scripts/daemon.mjs start
+```
+
+`POST http://127.0.0.1:9334/viewport` changes it at runtime; posting `{}`
+returns to the real window.
 
 ## Install as a personal skill instead
 
@@ -63,12 +75,14 @@ plugins/browser-verify/.claude-plugin/plugin.json
 plugins/browser-verify/skills/browser-verify/SKILL.md
 plugins/browser-verify/skills/browser-verify/scripts/browser.mjs
 plugins/browser-verify/skills/browser-verify/scripts/browserd.mjs
+plugins/browser-verify/skills/browser-verify/scripts/daemon.mjs
+plugins/browser-verify/skills/browser-verify/scripts/chrome.mjs
 LICENSE
 ```
 
-The exported copy uses daemon port `9334` and the temporary Chrome profile
-`/tmp/claude-browser-profile`, so it can coexist with a Codex copy using port
-`9333`. Override them with `BROWSERD_PORT` / `BROWSERD_URL`.
+The exported copy uses daemon port `9334` and a throwaway Chrome profile under
+the system temp directory (`os.tmpdir()`), so it can coexist with a Codex copy
+using port `9333`. Override them with `BROWSERD_PORT` / `BROWSERD_URL`.
 
 ## License
 

@@ -19,39 +19,35 @@ finding coordinates.
 | Path | Purpose |
 | --- | --- |
 | `scripts/browser.mjs` | Client. Every command you run goes through this. |
-| `scripts/browserd.mjs` | Long-lived CDP session that holds the emulated viewport. |
+| `scripts/browserd.mjs` | Long-lived CDP session held open by the daemon. |
+| `scripts/daemon.mjs` | Cross-platform `start` / `stop` / `status` for the daemon. |
+| `scripts/chrome.mjs` | Cross-platform Chrome launcher with a throwaway profile. |
 
-Both are dependency-free (Node 22 built-ins). Set `SKILL_DIR` to this skill's directory
-before running anything below.
+All are dependency-free (Node 22 built-ins) and run on macOS, Linux, and Windows.
+Set `SKILL_DIR` to this skill's directory before running anything below.
 
 ## Preconditions
 
 Two things must be running: Chrome with a debug port, and the daemon. Check first:
 
 ```bash
-curl -s --max-time 4 http://127.0.0.1:9334/health   # daemon
+node "$SKILL_DIR/scripts/daemon.mjs" status
 curl -s --max-time 4 http://127.0.0.1:9222/json/version | head -2   # chrome
 ```
 
-If Chrome is missing, launch it with a throwaway profile. Do not reuse the user's
-normal Chrome profile: this instance gets credentials typed into it.
+Launch both with the cross-platform helpers (macOS, Linux, and Windows):
 
 ```bash
-open -na "Google Chrome" --args \
-  --remote-debugging-port=9222 \
-  --user-data-dir=/tmp/claude-browser-profile \
-  --no-first-run --no-default-browser-check about:blank
+node "$SKILL_DIR/scripts/chrome.mjs"          # throwaway profile + debug port
+node "$SKILL_DIR/scripts/daemon.mjs" start    # detached background daemon
 ```
 
-If the daemon is missing, start it detached so it survives the command:
+`chrome.mjs` auto-detects Chrome; set `CHROME_PATH` if it is installed elsewhere.
+Do not reuse the user's normal Chrome profile: this instance gets credentials
+typed into it.
 
-```bash
-launchctl submit -l com.claude.browserd -- "$(command -v node)" \
-  "$SKILL_DIR/scripts/browserd.mjs"
-```
-
-Stop it later with `launchctl remove com.claude.browserd`. Close the browser with
-`browser.mjs quit`.
+Stop the daemon with `daemon.mjs stop`. Close the browser with `browser.mjs quit`.
+The same commands work from PowerShell or cmd on Windows.
 
 ## Running commands
 
@@ -74,13 +70,40 @@ node "$SKILL_DIR/scripts/browser.mjs" <command> [args]
 | `click <selector>` | Click a CSS selector |
 | `fill <selector> <value>` | Set an input's value and fire input/change |
 | `shot <path> [full]` | Screenshot to a file, `full` for the whole page |
-| `resize <w> <h>` | Resize the real window (macOS floor is ~500px wide) |
+| `resize <w> <h>` | Resize the real window; the content viewport follows (macOS floor is ~500px wide) |
 | `closeall` / `quit` | Close all tabs, or close Chrome entirely |
 
-Viewport defaults to a phone (390x844, 3x, iPhone UA) held open by the daemon. Override
-per command with `CDP_WIDTH`, `CDP_HEIGHT`, `CDP_MOBILE=0`. Emulation is opt-in for one-off
-commands precisely because a per-command override is dropped when the session detaches,
-which makes the page visibly reflow. Keep the daemon running to avoid that flicker.
+By default the content viewport **fills the real Chrome window**: the daemon
+applies no device emulation, so resizing the window resizes the page. To opt into
+an emulated (mobile) viewport, start the daemon with it:
+
+```bash
+BROWSERD_WIDTH=390 BROWSERD_HEIGHT=844 BROWSERD_MOBILE=1 \
+  node "$SKILL_DIR/scripts/daemon.mjs" start
+```
+
+PowerShell:
+
+```powershell
+$env:BROWSERD_WIDTH=390; $env:BROWSERD_HEIGHT=844; $env:BROWSERD_MOBILE=1
+node "$SKILL_DIR/scripts/daemon.mjs" start
+```
+
+Change it at runtime, or return to the real window:
+
+```bash
+curl -X POST http://127.0.0.1:9334/viewport \
+  -H 'content-type: application/json' \
+  -d '{"width":390,"height":844,"mobile":true}'
+
+curl -X POST http://127.0.0.1:9334/viewport \
+  -H 'content-type: application/json' -d '{}'
+```
+
+For a one-off command without the daemon, set `CDP_WIDTH` / `CDP_HEIGHT` (add
+`CDP_MOBILE=1` for mobile). A per-command override is dropped when the session
+detaches, which makes the page visibly reflow; keep the daemon running to avoid
+that flicker.
 
 ## Verification workflow
 

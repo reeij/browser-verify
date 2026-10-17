@@ -19,6 +19,10 @@
  *   node browser.mjs resize <width> <height> [left] [top]
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 const PORT = Number(process.env.CDP_PORT || 9222);
 const HOST = `127.0.0.1:${PORT}`;
 const DAEMON = process.env.BROWSERD_URL || "http://127.0.0.1:9334";
@@ -31,7 +35,8 @@ const EMULATE = process.env.CDP_WIDTH
       mobile: process.env.CDP_MOBILE === "1",
     }
   : null;
-const STATE_FILE = "/tmp/claude-browser-current";
+const STATE_FILE = join(tmpdir(), "claude-browser-current");
+const CHROME_SCRIPT = fileURLToPath(new URL("./chrome.mjs", import.meta.url));
 
 const [, , command, ...args] = process.argv;
 
@@ -47,10 +52,8 @@ async function listTargets() {
   } catch (error) {
     fail(
       `Cannot reach Chrome on port ${PORT}. Start it first with:\n` +
-        `  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \\\n` +
-        `    --remote-debugging-port=${PORT} \\\n` +
-        `    --user-data-dir=/tmp/claude-browser-profile \\\n` +
-        `    --no-first-run --no-default-browser-check about:blank`,
+        `  node "${CHROME_SCRIPT}"\n` +
+        `or launch Chrome yourself with --remote-debugging-port=${PORT}.`,
     );
   }
   const targets = await response.json();
@@ -230,7 +233,7 @@ async function connect(target) {
     await session.send("Emulation.setDeviceMetricsOverride", {
       width: EMULATE.width,
       height: EMULATE.height,
-      deviceScaleFactor: 2,
+      deviceScaleFactor: EMULATE.mobile ? 3 : 1,
       mobile: EMULATE.mobile,
     });
   }
