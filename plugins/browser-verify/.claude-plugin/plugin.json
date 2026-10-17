@@ -6,6 +6,8 @@
     "name": "liuchao"
   },
   "license": "MIT",
+  "homepage": "https://github.com/reeij/browser-verify",
+  "repository": "https://github.com/reeij/browser-verify",
   "keywords": [
     "browser",
     "chrome",

@@ -5,10 +5,10 @@ dependency-free Chrome DevTools scripts.
 
 ## Install with Claude Code
 
-From a hosted GitHub repository (replace `<owner>` with the repository owner):
+From GitHub:
 
 ```bash
-claude plugin marketplace add <owner>/browser-verify-marketplace
+claude plugin marketplace add reeij/browser-verify
 claude plugin install browser-verify@browser-verify-marketplace
 ```
 
