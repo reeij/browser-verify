@@ -1,5 +1,7 @@
 # Browser Verify for Claude Code
 
+**English** | [简体中文](README.zh-CN.md)
+
 A Claude Code plugin marketplace containing the `browser-verify` skill and its
 dependency-free Chrome DevTools scripts.
 
@@ -51,8 +53,7 @@ offers an update when the version changes; pushing commits with an unchanged
 version leaves users on their old copy and makes `claude plugin update` report
 `already at the latest version`.
 
-Fill in `homepage` and `repository` in
-`plugins/browser-verify/.claude-plugin/plugin.json` once the repository exists.
+The `homepage` and `repository` fields in `plugin.json` point at this repository.
 
 ## Contents
 
